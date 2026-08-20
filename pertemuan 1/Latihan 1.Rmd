@@ -1,3 +1,7 @@
+---
+---
+---
+
 ## Latihan MPDW
 
 dalam hal ini akan dibuat variabel x yang bernilai 3
