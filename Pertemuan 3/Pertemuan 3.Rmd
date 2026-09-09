@@ -1,1 +1,198 @@
+#Pertemuan 3
+
+```{r}
+library(dLagM)
+library(dynlm)
+library(MLmetrics)
+library(lmtest)
+library(car)
+```
+#Latihan 1 : Distributed Lag Model (Pangsa Pasar vs Harga)
+
+#Input Data
+```{r}
+Period <- 1:20
+Y <- c(3.63, 4.20, 3.33, 4.54, 2.89, 4.87, 4.90, 5.29, 6.18, 7.20,
+       7.25, 6.09, 6.80, 8.65, 8.43, 8.29, 7.18, 7.90, 8.45, 8.23)
+X <- c(0.97, 0.95, 0.99, 0.91, 0.98, 0.90, 0.89, 0.86, 0.85, 0.82,
+       0.79, 0.83, 0.81, 0.77, 0.76, 0.80, 0.83, 0.79, 0.76, 0.78)
+
+data1 <- data.frame(Period, Y, X)
+data1
+```
+
+#Eksplorasi Data
+```{r}
+plot(data1$X, data1$Y, type = "p", pch = 19, col = "red",
+     xlab = "Price", ylab = "Market Share",
+     main = "Scatter Plot Pangsa Pasar vs Harga")
+```
+
+#Pembagian Data
+```{r}
+data1_train <- data1[1:16, ]
+data1_test  <- data1[17:20, ]
+```
+
+#Model Koyck
+```{r}
+model.koyck1 <- koyckDlm(x = data1_train$X, y = data1_train$Y)
+summary(model.koyck1)
+```
+```{r}
+AIC(model.koyck1)
+```
+```{r}
+BIC(model.koyck1)
+```
+```{r}
+fore.koyck1 <- forecast(model = model.koyck1, x = data1_test$X, h = 4)
+fore.koyck1
+
+```
+```{r}
+mape.koyck1.test  <- MAPE(fore.koyck1$forecasts, data1_test$Y)
+mape.koyck1.train <- GoF(model.koyck1)$MAPE
+mape.koyck1.test
+```
+```{r}
+mape.koyck1.train
+```
+
+#Distributed Lag Model (DLM) - Penentuan Lag Optimum
+```{r}
+finiteDLMauto(formula = Y ~ X,
+              data = data.frame(data1_train),
+              q.min = 1, q.max = 5,
+              model.type = "dlm", error.type = "AIC")
+```
+```{r}
+model.dlm1 <- dlm(formula = Y ~ X, data = data.frame(data1_train), q = 1)
+summary(model.dlm1)
+```
+```{r}
+AIC(model.dlm1)
+```
+```{r}
+BIC(model.dlm1)
+```
+```{r}
+fore.dlm1 <- forecast(model = model.dlm1, x = data1_test$X, h = 4)
+fore.dlm1
+```
+```{r}
+mape.dlm1.test  <- MAPE(fore.dlm1$forecasts, data1_test$Y)
+mape.dlm1.train <- GoF(model.dlm1)$MAPE
+mape.dlm1.test
+```
+```{r}
+mape.dlm1.train
+```
+
+#Perbandingan Model & Kesimpulan Latihan 1
+```{r}
+akurasi1 <- matrix(c(mape.koyck1.test, mape.dlm1.test))
+row.names(akurasi1) <- c("Koyck", "DLM")
+colnames(akurasi1) <- c("MAPE Testing")
+akurasi1
+
+```
+```{r}
+plot(data1_test$X, data1_test$Y, type = "b", col = "black", pch = 19,
+     ylim = range(c(data1_test$Y, fore.koyck1$forecasts, fore.dlm1$forecasts)),
+     xlab = "Price", ylab = "Market Share")
+points(data1_test$X, fore.koyck1$forecasts, col = "blue")
+lines(data1_test$X, fore.koyck1$forecasts, col = "blue")
+points(data1_test$X, fore.dlm1$forecasts, col = "red")
+lines(data1_test$X, fore.dlm1$forecasts, col = "red")
+legend("topright", c("Aktual", "Koyck", "DLM"), lty = 1,
+       col = c("black", "blue", "red"), cex = 0.8)
+```
+
+
+#Latihan 2 : ARDL (Sales vs Advertising)
+
+#Input Data
+```{r}
+Year <- 1975:2014
+Sales <- c(11.7, 12.0, 12.3, 12.8, 13.1, 13.6, 13.9, 14.4, 14.7, 15.3,
+           15.5, 15.8, 16.1, 16.6, 16.9, 16.7, 16.9, 17.4, 17.6, 17.9,
+           18.0, 17.9, 18.0, 18.2, 18.2, 18.3, 18.6, 19.2, 19.3, 19.5,
+           19.2, 19.3, 19.5, 20.0, 20.0, 19.9, 19.8, 19.9, 20.2, 21.0)
+Advertising <- c(9.4, 9.6, 10.0, 10.4, 10.8, 10.9, 11.7, 12.2, 12.5, 12.9,
+                  13.0, 13.2, 13.8, 14.2, 14.6, 14.9, 15.0, 15.4, 15.7, 15.9,
+                  15.9, 16.0, 16.3, 16.2, 16.8, 17.3, 17.6, 18.1, 18.3, 18.5,
+                  18.7, 18.9, 19.2, 20.0, 20.0, 20.3, 20.4, 21.0, 21.5, 22.1)
+
+data2 <- data.frame(Year, Sales, Advertising)
+data2
+```
+
+#EKsplorasi Data
+```{r}
+plot(data2$Year, data2$Sales, type = "l", col = "blue",
+     xlab = "Year", ylab = "Sales", main = "Tren Sales 1975-2014")
+```
+
+#Pembagian Data
+```{r}
+data2_train <- data2[1:32, ]
+data2_test  <- data2[33:40, ]
+```
+
+#Penentuan Lag Optimum ARDL
+```{r}
+model.ardl2.opt <- ardlBoundOrders(data = data.frame(data2), ic = "AIC",
+                                    formula = Sales ~ Advertising)
+
+min_p <- c()
+for (i in 1:15) {
+  min_p[i] <- min(model.ardl2.opt$Stat.table[[i]])
+}
+q_opt <- which(min_p == min(min_p, na.rm = TRUE))
+p_opt <- which(model.ardl2.opt$Stat.table[[q_opt]] ==
+                 min(model.ardl2.opt$Stat.table[[q_opt]], na.rm = TRUE))
+
+data.frame("q_optimum" = q_opt, "p_optimum" = p_opt,
+           "AIC" = model.ardl2.opt$min.Stat)
+```
+
+#Pemodelan ARDL dengan Lag Optimum
+```{r}
+model.ardl2 <- ardlDlm(formula = Sales ~ Advertising, data = data2_train,
+                        p = 1, q = 1)
+summary(model.ardl2)
+```
+```{r}
+AIC(model.ardl2)
+```
+```{r}
+BIC(model.ardl2)
+```
+
+#Peramalan dan Akurasi Model ARDL
+```{r}
+fore.ardl2 <- forecast(model = model.ardl2, x = data2_test$Advertising, h = 8)
+fore.ardl2
+
+```
+```{r}
+mape.ardl2.test  <- MAPE(fore.ardl2$forecasts, data2_test$Sales)
+mape.ardl2.train <- GoF(model.ardl2)$MAPE
+mape.ardl2.test
+```
+```{r}
+mape.ardl2.train
+```
+
+#Plot Perbandingan Aktual vs Ramalan
+```{r}
+plot(data2_test$Year, data2_test$Sales, type = "b", col = "gray", pch = 19,
+     ylim = range(c(data2_test$Sales, fore.ardl2$forecasts)),
+     xlab = "Year", ylab = "Sales")
+points(data2_test$Year, fore.ardl2$forecasts, col = "pink")
+lines(data2_test$Year, fore.ardl2$forecasts, col = "pink")
+legend("topleft", c("Aktual", "ARDL"), lty = 1,
+       col = c("gray", "pink"), cex = 0.8)
+```
 
