@@ -1,1 +1,278 @@
+```{r}
+library(TSA)
 
+set.seed(123) 
+n <- 300
+```
+
+# Proses MA(2)
+
+Model: $Y_t = e_t + \theta_1 e_{t-1} + \theta_2 e_{t-2}$, dengan $\theta_1 = 0.4$ dan $\theta_2 = 0.6$.
+
+## Membangkitkan Data
+
+### Cara Manual
+
+```{r}
+theta1 <- 0.4
+theta2 <- 0.6
+
+e <- rnorm(n + 2)  # white noise, dilebihkan 2 untuk inisiasi lag
+Y_ma2_manual <- numeric(n)
+
+for (t in 1:n) {
+  Y_ma2_manual[t] <- e[t + 2] + theta1 * e[t + 1] + theta2 * e[t]
+}
+
+Y_ma2_manual <- ts(Y_ma2_manual)
+head(Y_ma2_manual)
+```
+
+### Menggunakan arima.sim
+
+```{r}
+Y_ma2_sim <- arima.sim(model = list(ma = c(theta1, theta2)), n = n)
+head(Y_ma2_sim)
+```
+
+## Plot Time Series
+
+```{r}
+par(mfrow = c(2, 1))
+plot.ts(Y_ma2_manual, main = "Plot Time Series MA(2) - Manual", ylab = "Yt")
+plot.ts(Y_ma2_sim, main = "Plot Time Series MA(2) - arima.sim", ylab = "Yt")
+par(mfrow = c(1, 1))
+```
+
+## Plot ACF, PACF, dan EACF
+
+```{r}
+par(mfrow = c(1, 2))
+acf(Y_ma2_manual, main = "ACF MA(2) - Manual")
+pacf(Y_ma2_manual, main = "PACF MA(2) - Manual")
+par(mfrow = c(1, 1))
+```
+
+```{r}
+eacf(Y_ma2_manual)
+```
+
+**Identifikasi kestasionerary:** Proses MA(q) selalu stasioner untuk sembarang nilai parameter, karena merupakan kombinasi linear terbatas (finite) dari white noise. Pada plot ACF, terlihat lag signifikan terputus (cuts off) setelah lag ke-2, sesuai dengan orde MA(2), sedangkan PACF meluruh (tails off) secara bertahap.
+
+## Scatterplot Yt vs Lag
+
+```{r}
+par(mfrow = c(1, 3))
+plot(Y_ma2_manual[-c(n)], Y_ma2_manual[-1],
+     xlab = expression(Y[t-1]), ylab = expression(Y[t]),
+     main = expression(Y[t]~"vs"~Y[t-1]))
+plot(Y_ma2_manual[1:(n-2)], Y_ma2_manual[3:n],
+     xlab = expression(Y[t-2]), ylab = expression(Y[t]),
+     main = expression(Y[t]~"vs"~Y[t-2]))
+plot(Y_ma2_manual[1:(n-3)], Y_ma2_manual[4:n],
+     xlab = expression(Y[t-3]), ylab = expression(Y[t]),
+     main = expression(Y[t]~"vs"~Y[t-3]))
+par(mfrow = c(1, 1))
+```
+
+## Autokorelasi: Data Bangkitan vs Teoritis
+
+```{r}
+# Autokorelasi dari data bangkitan
+acf_ma2_data <- acf(Y_ma2_manual, plot = FALSE)$acf
+acf_ma2_data[1:4]
+```
+
+```{r}
+# Autokorelasi teoritis MA(2)
+# rho1 = (theta1 + theta1*theta2) / (1 + theta1^2 + theta2^2)
+# rho2 = theta2 / (1 + theta1^2 + theta2^2)
+# rho_k = 0 untuk k > 2
+rho1_teori <- (theta1 + theta1 * theta2) / (1 + theta1^2 + theta2^2)
+rho2_teori <- theta2 / (1 + theta1^2 + theta2^2)
+
+cat("rho1 teoritis =", rho1_teori, "\n")
+cat("rho2 teoritis =", rho2_teori, "\n")
+cat("rho_k = 0 untuk k > 2 (teoritis)\n")
+```
+
+------------------------------------------------------------------------
+
+# Proses AR(2)
+
+Model: $Y_t = \phi_1 Y_{t-1} + \phi_2 Y_{t-2} + e_t$, dengan $\phi_1 = 0.5$ dan $\phi_2 = 0.2$.
+
+## Membangkitkan Data
+
+### Cara Manual
+
+```{r}
+phi1 <- 0.5
+phi2 <- 0.2
+
+e2 <- rnorm(n + 100)  # burn-in 100 observasi
+Y_ar2_manual <- numeric(n + 100)
+
+for (t in 3:(n + 100)) {
+  Y_ar2_manual[t] <- phi1 * Y_ar2_manual[t - 1] + phi2 * Y_ar2_manual[t - 2] + e2[t]
+}
+
+Y_ar2_manual <- ts(Y_ar2_manual[-(1:100)])  # buang burn-in
+head(Y_ar2_manual)
+```
+
+### Menggunakan arima.sim
+
+```{r}
+Y_ar2_sim <- arima.sim(model = list(ar = c(phi1, phi2)), n = n)
+head(Y_ar2_sim)
+```
+
+## Plot Time Series
+
+```{r}
+par(mfrow = c(2, 1))
+plot.ts(Y_ar2_manual, main = "Plot Time Series AR(2) - Manual", ylab = "Yt")
+plot.ts(Y_ar2_sim, main = "Plot Time Series AR(2) - arima.sim", ylab = "Yt")
+par(mfrow = c(1, 1))
+```
+
+## Plot ACF, PACF, dan EACF
+
+```{r}
+par(mfrow = c(1, 2))
+acf(Y_ar2_manual, main = "ACF AR(2) - Manual")
+pacf(Y_ar2_manual, main = "PACF AR(2) - Manual")
+par(mfrow = c(1, 1))
+```
+
+```{r}
+eacf(Y_ar2_manual)
+```
+
+**Identifikasi kestasionerary:** Proses AR(2) dikatakan stasioner jika akar-akar persamaan karakteristik berada di luar lingkaran satuan (unit circle). Dengan $\phi_1 = 0.5$ dan $\phi_2 = 0.2$, dapat diperiksa syarat kestasioneran AR(2): $\phi_1 + \phi_2 < 1$, $\phi_2 - \phi_1 < 1$, dan $|\phi_2| < 1$. Ketiga syarat terpenuhi sehingga proses bersifat stasioner. Hal ini didukung oleh plot ACF yang meluruh (tails off) secara eksponensial/gelombang teredam, sedangkan PACF terputus (cuts off) setelah lag ke-2.
+
+```{r}
+cat("phi1 + phi2 =", phi1 + phi2, "< 1 ?", (phi1 + phi2) < 1, "\n")
+cat("phi2 - phi1 =", phi2 - phi1, "< 1 ?", (phi2 - phi1) < 1, "\n")
+cat("|phi2| =", abs(phi2), "< 1 ?", abs(phi2) < 1, "\n")
+```
+
+## Scatterplot Yt vs Lag
+
+```{r}
+par(mfrow = c(1, 3))
+plot(Y_ar2_manual[-c(n)], Y_ar2_manual[-1],
+     xlab = expression(Y[t-1]), ylab = expression(Y[t]),
+     main = expression(Y[t]~"vs"~Y[t-1]))
+plot(Y_ar2_manual[1:(n-2)], Y_ar2_manual[3:n],
+     xlab = expression(Y[t-2]), ylab = expression(Y[t]),
+     main = expression(Y[t]~"vs"~Y[t-2]))
+plot(Y_ar2_manual[1:(n-3)], Y_ar2_manual[4:n],
+     xlab = expression(Y[t-3]), ylab = expression(Y[t]),
+     main = expression(Y[t]~"vs"~Y[t-3]))
+par(mfrow = c(1, 1))
+```
+
+## Autokorelasi: Data Bangkitan vs Teoritis
+
+```{r}
+acf_ar2_data <- acf(Y_ar2_manual, plot = FALSE)$acf
+acf_ar2_data[1:4]
+```
+
+```{r}
+# Autokorelasi teoritis AR(2) menggunakan ARMAacf
+rho_ar2_teori <- ARMAacf(ar = c(phi1, phi2), lag.max = 3)
+rho_ar2_teori
+```
+
+------------------------------------------------------------------------
+
+# Proses ARMA(2,2)
+
+Model: $Y_t = \phi_1 Y_{t-1} + \phi_2 Y_{t-2} + e_t + \theta_1 e_{t-1} + \theta_2 e_{t-2}$, dengan $\phi_1 = 0.5$, $\phi_2 = 0.2$, $\theta_1 = 0.4$, $\theta_2 = 0.6$.
+
+## Membangkitkan Data
+
+### Cara Manual
+
+```{r}
+e3 <- rnorm(n + 100)
+Y_arma22_manual <- numeric(n + 100)
+
+for (t in 3:(n + 100)) {
+  Y_arma22_manual[t] <- phi1 * Y_arma22_manual[t - 1] + phi2 * Y_arma22_manual[t - 2] +
+    e3[t] + theta1 * e3[t - 1] + theta2 * e3[t - 2]
+}
+
+Y_arma22_manual <- ts(Y_arma22_manual[-(1:100)])
+head(Y_arma22_manual)
+```
+
+### Menggunakan arima.sim
+
+```{r}
+Y_arma22_sim <- arima.sim(model = list(ar = c(phi1, phi2), ma = c(theta1, theta2)), n = n)
+head(Y_arma22_sim)
+```
+
+## Plot Time Series
+
+```{r}
+par(mfrow = c(2, 1))
+plot.ts(Y_arma22_manual, main = "Plot Time Series ARMA(2,2) - Manual", ylab = "Yt")
+plot.ts(Y_arma22_sim, main = "Plot Time Series ARMA(2,2) - arima.sim", ylab = "Yt")
+par(mfrow = c(1, 1))
+```
+
+## Plot ACF, PACF, dan EACF
+
+```{r}
+par(mfrow = c(1, 2))
+acf(Y_arma22_manual, main = "ACF ARMA(2,2) - Manual")
+pacf(Y_arma22_manual, main = "PACF ARMA(2,2) - Manual")
+par(mfrow = c(1, 1))
+```
+
+```{r}
+eacf(Y_arma22_manual)
+```
+
+**Identifikasi kestasionerary:** Kestasioneran proses ARMA(2,2) ditentukan oleh komponen AR-nya. Karena $\phi_1 = 0.5$ dan $\phi_2 = 0.2$ memenuhi syarat kestasioneran AR(2) (sama seperti bagian sebelumnya), maka proses ARMA(2,2) ini juga stasioner. Pada plot ACF dan PACF, keduanya cenderung meluruh (tails off) karena adanya campuran komponen AR dan MA, tidak terputus tegas seperti pada proses AR maupun MA murni.
+
+## Scatterplot Yt vs Lag
+
+```{r}
+par(mfrow = c(1, 3))
+plot(Y_arma22_manual[-c(n)], Y_arma22_manual[-1],
+     xlab = expression(Y[t-1]), ylab = expression(Y[t]),
+     main = expression(Y[t]~"vs"~Y[t-1]))
+plot(Y_arma22_manual[1:(n-2)], Y_arma22_manual[3:n],
+     xlab = expression(Y[t-2]), ylab = expression(Y[t]),
+     main = expression(Y[t]~"vs"~Y[t-2]))
+plot(Y_arma22_manual[1:(n-3)], Y_arma22_manual[4:n],
+     xlab = expression(Y[t-3]), ylab = expression(Y[t]),
+     main = expression(Y[t]~"vs"~Y[t-3]))
+par(mfrow = c(1, 1))
+```
+
+## Autokorelasi: Data Bangkitan vs Teoritis
+
+```{r}
+acf_arma22_data <- acf(Y_arma22_manual, plot = FALSE)$acf
+acf_arma22_data[1:4]
+```
+
+```{r}
+rho_arma22_teori <- ARMAacf(ar = c(phi1, phi2), ma = c(theta1, theta2), lag.max = 3)
+rho_arma22_teori
+```
+
+# Kesimpulan
+
+| Proses | Parameter | Stasioner? | Pola ACF | Pola PACF |
+|----|----|----|----|----|
+| MA(2) | $\theta_1=0.4,\ \theta_2=0.6$ | Ya | Cuts off lag 2 | Tails off |
+| AR(2) | $\phi_1=0.5,\ \phi_2=0.2$ | Ya | Tails off | Cuts off lag 2 |
+| ARMA(2,2) | $\phi_1=0.5,\phi_2=0.2,\theta_1=0.4,\theta_2=0.6$ | Ya | Tails off | Tails off |
